@@ -1,0 +1,63 @@
+name: Flutter CI — Build & Test
+
+on:
+  workflow_call:
+    inputs:
+      flutter_version:
+        required: false
+        type: string
+        default: '3.24.0'
+      build_apk:
+        required: false
+        type: boolean
+        default: true
+      run_tests:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      GOOGLE_SERVICES_JSON:
+        required: false
+
+jobs:
+  flutter-build:
+    name: Flutter Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore google-services.json
+        if: secrets.GOOGLE_SERVICES_JSON != ''
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        if: inputs.run_tests
+        run: flutter test --coverage
+
+      - name: Build APK (debug)
+        if: inputs.build_apk
+        run: flutter build apk --debug
+
+      - name: Upload APK
+        if: inputs.build_apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7

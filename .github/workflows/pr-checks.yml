@@ -1,0 +1,40 @@
+name: PR Checks — Agent Quality Gate
+
+on:
+  workflow_call:
+
+jobs:
+  pr-quality:
+    name: PR Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check branch naming
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if [[ "$BRANCH" =~ ^(agent|hotfix|feat|fix|chore)\/[0-9]+-[a-z0-9-]+$ ]]; then
+            echo "✅ Branch naming: $BRANCH"
+          else
+            echo "⚠️ Suggestion: use agent/{issue}-{slug} format. Current: $BRANCH"
+          fi
+
+      - name: Check commit convention
+        run: |
+          LAST=$(git log -1 --format="%s")
+          if [[ "$LAST" =~ ^(feat|fix|chore|docs|test|refactor|perf|ci)\(.+\):\ .+ ]]; then
+            echo "✅ Commit: $LAST"
+          else
+            echo "⚠️ Suggestion: feat(scope): description (#issue). Current: $LAST"
+          fi
+
+      - name: PR size check
+        run: |
+          TOTAL=$(( ${{ github.event.pull_request.additions }} + ${{ github.event.pull_request.deletions }} ))
+          if [ "$TOTAL" -gt 1000 ]; then
+            echo "⚠️ Large PR: $TOTAL lines changed. Consider splitting."
+          else
+            echo "✅ PR size: $TOTAL lines"
+          fi
