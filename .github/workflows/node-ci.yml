@@ -11,20 +11,44 @@ on:
         required: false
         type: boolean
         default: true
+      # Carpeta del paquete a construir. Por defecto la raíz, que es como
+      # estaban montados todos los repos cuando se escribió este workflow.
+      #
+      # Un repo con el backend y el frontend en carpetas distintas no tiene
+      # package-lock.json en la raíz, y `setup-node` con `cache: npm` falla
+      # antes de llegar a instalar nada: "Dependencies lock file is not found".
+      # Eso dejó el CI del ERP en rojo durante varias semanas sin que nadie lo
+      # mirara, porque el fallo parecía de la propia acción y no de las pruebas.
+      workdir:
+        required: false
+        type: string
+        default: '.'
+      # Sólo para distinguir los trabajos en la interfaz cuando un repo llama a
+      # este workflow más de una vez.
+      name_suffix:
+        required: false
+        type: string
+        default: ''
     secrets:
       DATABASE_URL:
         required: false
 
 jobs:
   node-build:
-    name: Node.js Build & Test
+    name: Node.js Build & Test${{ inputs.name_suffix }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.workdir }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
           cache: npm
+          # `cache-dependency-path` no pasa por `defaults.run`, así que la ruta
+          # va completa desde la raíz del repo.
+          cache-dependency-path: ${{ inputs.workdir }}/package-lock.json
       - run: npm ci
       - name: Lint
         run: npm run lint --if-present
